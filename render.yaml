@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: sinclair-live
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --timeout 120 --workers 1 sinclair_server:app
+    envVars:
+      - key: FMP_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.9

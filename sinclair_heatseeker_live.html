@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sinclair AI — Heatseeker Live</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#080a0e;--bg1:#0e1117;--bg2:#141820;--bg3:#1a1f2a;--bg4:#212736;
+  --border:#232836;--border2:#2e3645;--border3:#3a4255;
+  --t1:#dde1ec;--t2:#8b93a8;--t3:#525c72;--t4:#353d50;
+  --yellow:#f5c540;--ydim:rgba(245,197,64,.11);
+  --purple:#9c6ef0;--pdim:rgba(156,110,240,.11);
+  --green:#36d68a;--red:#ef5350;--blue:#4d9ef5;--orange:#f09a38;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans','Helvetica Neue',sans-serif;
+}
+html,body{height:100%;background:var(--bg0);color:var(--t1);font-family:var(--sans);font-size:15px;overflow:hidden}
+
+/* TOP BAR */
+.topbar{height:56px;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:14px;flex-shrink:0}
+.logo{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.14em;color:var(--yellow);white-space:nowrap}
+.logo em{color:var(--t4);font-style:normal;font-weight:400}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.dot.live{background:var(--green);animation:blink 2s ease-in-out infinite}
+.dot.loading{background:var(--orange);animation:blink .5s ease-in-out infinite}
+.dot.error{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.conn-lbl{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+.ticker-strip{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex:1}
+.ticker-strip::-webkit-scrollbar{display:none}
+.ttab{background:none;border:none;cursor:pointer;padding:7px 14px;border-radius:5px;font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.05em;color:var(--t3);transition:color .12s,background .12s;white-space:nowrap}
+.ttab:hover{background:var(--bg3);color:var(--t2)}
+.ttab.on{background:var(--bg3);color:var(--yellow);position:relative}
+.ttab.on::after{content:'';position:absolute;bottom:0;left:10px;right:10px;height:2px;background:var(--yellow);border-radius:2px}
+.sep{width:1px;height:22px;background:var(--border);flex-shrink:0}
+.mode-grp{display:flex;gap:4px}
+.mbtn{background:none;border:1px solid var(--border);cursor:pointer;padding:6px 13px;border-radius:5px;font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.08em;color:var(--t3);transition:all .12s}
+.mbtn:hover{border-color:var(--border3);color:var(--t2)}
+.mbtn.on{background:var(--bg3);border-color:var(--purple);color:var(--purple)}
+.ts-lbl{font-family:var(--mono);font-size:11px;color:var(--t4);white-space:nowrap;margin-left:4px}
+.refresh-btn{background:none;border:1px solid var(--border);cursor:pointer;padding:6px 12px;border-radius:5px;font-family:var(--mono);font-size:11px;color:var(--t3);transition:all .12s;white-space:nowrap}
+.refresh-btn:hover{border-color:var(--border3);color:var(--t2)}
+
+/* BODY */
+.body{display:flex;height:calc(100vh - 56px);overflow:hidden}
+.sidebar{width:260px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.chart-wrap{flex:1;position:relative;background:var(--bg0);overflow:hidden;display:flex;flex-direction:column}
+.chart-split{flex:1;display:flex;min-height:0}
+.chart-price{flex:1.4;position:relative;border-right:1px solid var(--border);min-width:0}
+.chart-price-hdr{position:absolute;top:10px;left:14px;z-index:5;font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:14px;pointer-events:none}
+.chart-price-hdr .sym{color:var(--t1);font-weight:600;margin-right:8px}
+.tf-group{display:flex;gap:2px;pointer-events:auto}
+.tf-btn{background:none;border:1px solid var(--border);cursor:pointer;padding:4px 10px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--t3);transition:all .12s}
+.tf-btn:hover{border-color:var(--border3);color:var(--t2)}
+.tf-btn.on{background:var(--bg3);border-color:var(--yellow);color:var(--yellow)}
+.chart-gex{flex:1;position:relative;min-width:0}
+.chart-gex-hdr{position:absolute;top:10px;left:14px;z-index:5;font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;pointer-events:none}
+.right-panel{width:220px;flex-shrink:0;background:var(--bg1);border-left:1px solid var(--border);padding:14px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+
+/* SIDEBAR */
+.slabel{font-size:10.5px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--t3);margin-bottom:7px;font-weight:500}
+.scard{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:12px 14px}
+.sv{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1.1;letter-spacing:-.01em}
+.sv.g{color:var(--green)}.sv.r{color:var(--red)}.sv.y{color:var(--yellow)}.sv.p{color:var(--purple)}.sv.o{color:var(--orange)}
+.sl{font-size:12px;color:var(--t2);margin-top:5px;font-family:var(--mono)}
+.lrow{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:5px}
+.ldot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.lname{font-size:12.5px;color:var(--t2);flex:1;letter-spacing:.01em}
+.lprice{font-family:var(--mono);font-size:13.5px;color:var(--t1);font-weight:500}
+.lnote{font-size:10.5px;color:var(--t4)}
+.regime{display:inline-flex;align-items:center;gap:7px;border:1px solid;border-radius:5px;padding:6px 12px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em}
+.conf-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.conf-dot{width:10px;height:10px;border-radius:50%}
+.conf-lbl{font-size:12px;color:var(--t2)}
+.greek-row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border)}
+.greek-row:last-child{border-bottom:none}
+.greek-name{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.08em;font-weight:500}
+.greek-val{font-family:var(--mono);font-size:13px;font-weight:500}
+.legend-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);padding:3px 0}
+.lswatch{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+
+/* CHART OVERLAYS */
+#hm{display:block}
+.price-tag{position:absolute;right:0;background:var(--green);color:#000;font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:2px 0 0 2px;pointer-events:none;white-space:nowrap;z-index:5}
+.king-tag{position:absolute;background:var(--yellow);color:#000;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 6px;border-radius:2px;letter-spacing:.06em;pointer-events:none;white-space:nowrap;z-index:5}
+.hover-panel{position:absolute;left:80px;background:rgba(14,17,23,.97);border:1px solid var(--border3);border-radius:6px;padding:9px 12px;font-family:var(--mono);font-size:10px;line-height:1.8;pointer-events:none;z-index:10;display:none;min-width:180px}
+.xhair{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.09);pointer-events:none;display:none;z-index:4}
+
+/* LOADING OVERLAY */
+.loading-overlay{position:absolute;inset:0;background:rgba(8,10,14,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;gap:12px}
+.spinner{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--yellow);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:var(--mono);font-size:11px;color:var(--t2);letter-spacing:.06em}
+
+/* RIGHT PANEL */
+.mticker{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:7px 9px;cursor:pointer;transition:all .12s;margin-bottom:3px}
+.mticker:hover{background:var(--bg3);border-color:var(--border2)}
+.mticker.on{border-color:var(--yellow);background:var(--bg3)}
+.msym{font-family:var(--mono);font-size:11px;font-weight:600}
+.mprice{font-family:var(--mono);font-size:10px;color:var(--t2)}
+.mbar{height:3px;background:var(--bg0);border-radius:2px;margin-top:5px;overflow:hidden}
+.mbar-fill{height:100%;border-radius:2px;transition:width .5s}
+.mbias{font-size:9px;margin-top:3px;font-family:var(--mono);letter-spacing:.04em}
+.mchg{font-size:9px;font-family:var(--mono)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Sinclair <em>/ Heatseeker Live</em></div>
+  <div class="dot" id="conn-dot"></div>
+  <div class="conn-lbl" id="conn-lbl">connecting...</div>
+  <div class="sep"></div>
+  <div class="ticker-strip" id="tabs"></div>
+  <div class="sep"></div>
+  <div class="mode-grp">
+    <button class="mbtn on"  onclick="setMode('gex',this)">GEX</button>
+    <button class="mbtn"     onclick="setMode('vex',this)">VEX</button>
+    <button class="mbtn"     onclick="setMode('oi', this)">OI</button>
+  </div>
+  <button class="refresh-btn" onclick="forceRefresh()">↺ refresh</button>
+  <div class="ts-lbl" id="tslbl"></div>
+</div>
+
+<div class="body">
+  <div class="sidebar">
+    <div>
+      <div class="slabel">Spot price</div>
+      <div class="scard">
+        <div class="sv" id="sb-spot">—</div>
+        <div class="sl" id="sb-chg">—</div>
+      </div>
+    </div>
+    <div>
+      <div class="slabel">Key levels</div>
+      <div id="lvl-list"></div>
+    </div>
+    <div>
+      <div class="slabel">Regime</div>
+      <div id="regime-el"></div>
+    </div>
+    <div>
+      <div class="slabel">Dealer exposure (GEX/VEX/CEX)</div>
+      <div class="scard">
+        <div id="greek-rows"></div>
+      </div>
+    </div>
+    <div>
+      <div class="slabel">Confluence</div>
+      <div id="conf-el"></div>
+    </div>
+    <div>
+      <div class="slabel">Expirations loaded</div>
+      <div id="exp-list" style="font-family:var(--mono);font-size:9px;color:var(--t3);line-height:1.8"></div>
+    </div>
+    <div>
+      <div class="slabel">Scenario</div>
+      <div id="scenario-el"></div>
+    </div>
+    <div>
+      <div class="slabel">Legend</div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <div class="legend-row"><div class="lswatch" style="background:var(--yellow)"></div> Absorbing / Pika (+GEX)</div>
+        <div class="legend-row"><div class="lswatch" style="background:var(--purple)"></div> Amplifying / Barney (−GEX)</div>
+        <div class="legend-row"><div class="lswatch" style="background:var(--green);opacity:.7"></div> Current price</div>
+        <div class="legend-row"><div class="lswatch" style="background:var(--blue);opacity:.7"></div> Gamma flip</div>
+        <div class="legend-row" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span style="color:var(--yellow);font-family:var(--mono);font-size:9px">★ KING</span><span style="margin-left:6px;font-size:10px;color:var(--t2)">Highest |GEX|, EOW pin</span></div>
+        <div class="legend-row"><span style="color:var(--purple);font-family:var(--mono);font-size:9px">⬡ GATE</span><span style="margin-left:6px;font-size:10px;color:var(--t2)">Blocks path to King</span></div>
+        <div class="legend-row"><span style="color:var(--red);font-family:var(--mono);font-size:9px">⚡ VELOCITY</span><span style="margin-left:6px;font-size:10px;color:var(--t2)">Gradient spike, fast moves</span></div>
+        <div class="legend-row"><span style="color:var(--orange);font-family:var(--mono);font-size:9px">◈ STACK</span><span style="margin-left:6px;font-size:10px;color:var(--t2)">Cross-expiry OI stacked</span></div>
+        <div class="legend-row"><span style="color:var(--blue);font-family:var(--mono);font-size:9px">▬ CLUSTER</span><span style="margin-left:6px;font-size:10px;color:var(--t2)">Consecutive same-sign run</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-wrap" id="cw">
+    <div class="chart-split">
+      <div class="chart-price" id="priceWrap">
+        <div class="chart-price-hdr">
+          <span class="sym" id="priceHdrSym">SPY</span>
+          <span id="priceHdrMeta">price + gamma levels</span>
+          <div class="tf-group" id="tfGroup">
+            <button class="tf-btn" data-tf="1H">1H</button>
+            <button class="tf-btn" data-tf="4H">4H</button>
+            <button class="tf-btn on" data-tf="1D">1D</button>
+          </div>
+        </div>
+        <div id="priceChart" style="position:absolute;inset:0"></div>
+      </div>
+      <div class="chart-gex" id="gexWrap">
+        <div class="chart-gex-hdr">GEX per strike</div>
+        <canvas id="hm"></canvas>
+        <div class="price-tag" id="ptag" style="display:none"></div>
+        <div class="king-tag" id="ktag" style="display:none">★ KING NODE</div>
+        <div class="hover-panel" id="hp"></div>
+        <div class="xhair" id="xh"></div>
+      </div>
+    </div>
+    <div class="loading-overlay" id="loader">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loader-text">FETCHING DATA...</div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="slabel" style="margin-bottom:8px">All tickers</div>
+    <div id="mlist"></div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════ */
+const API = '/api';
+const TICKERS = ["SPY","XOM","UPS","RIVN","NVDA","AMD","AAPL","HOOD","AVGO","SOFI","AFRM"];
+const REFRESH_MS = 5 * 60 * 1000;  // 5 minutes
+
+/* ════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════ */
+let curSym   = 'SPY';
+let mode     = 'gex';
+let curData  = null;   // full node data for current ticker
+let allData  = {};     // sym → summary (from /api/gex/all)
+let hovered  = null;
+let serverOk = false;
+
+/* ════════════════════════════════════════════
+   CONNECTION STATUS
+   ════════════════════════════════════════════ */
+function setConn(state, msg){
+  const dot = document.getElementById('conn-dot');
+  const lbl = document.getElementById('conn-lbl');
+  dot.className = 'dot ' + state;
+  lbl.textContent = msg;
+}
+
+async function checkServer(){
+  try {
+    const r = await fetch(`${API}/health`, {signal: AbortSignal.timeout(3000)});
+    if(r.ok){ serverOk = true; setConn('live','live data'); return true; }
+  } catch(e){}
+  serverOk = false;
+  setConn('error','server offline — start sinclair_server.py');
+  return false;
+}
+
+/* ════════════════════════════════════════════
+   FETCH
+   ════════════════════════════════════════════ */
+async function fetchTicker(sym, force=false){
+  showLoader(`FETCHING ${sym}...`);
+  try {
+    const url = force ? `${API}/refresh/${sym}` : `${API}/gex/${sym}`;
+    const r = await fetch(url, {signal: AbortSignal.timeout(30000)});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    curData = data;
+    hideLoader();
+    return data;
+  } catch(e) {
+    hideLoader();
+    setConn('error', e.message.slice(0,40));
+    return null;
+  }
+}
+
+async function fetchAll(){
+  try {
+    const r = await fetch(`${API}/gex/all`, {signal: AbortSignal.timeout(5000)});
+    if(!r.ok) return;
+    const j = await r.json();
+    j.tickers.forEach(t => { if(t.levels) allData[t.symbol] = t; });
+    buildMini();
+  } catch(e){}
+}
+
+/* ════════════════════════════════════════════
+   TABS
+   ════════════════════════════════════════════ */
+const tabsEl = document.getElementById('tabs');
+TICKERS.forEach(s => {
+  const b = document.createElement('button');
+  b.className = 'ttab' + (s===curSym?' on':'');
+  b.textContent = s;
+  b.onclick = () => pick(s);
+  tabsEl.appendChild(b);
+});
+
+function setMode(m, el){
+  mode = m;
+  document.querySelectorAll('.mbtn').forEach(b => b.classList.toggle('on', b===el));
+  if(curData) renderAll(curData);
+}
+
+async function pick(sym){
+  curSym = sym;
+  document.querySelectorAll('.ttab').forEach(b => b.classList.toggle('on', b.textContent===sym));
+  document.querySelectorAll('.mticker').forEach((b,i) => b.classList.toggle('on', TICKERS[i]===sym));
+  const data = await fetchTicker(sym);
+  if(data) renderAll(data);
+}
+
+async function forceRefresh(){
+  const data = await fetchTicker(curSym, true);
+  if(data){ curData = data; renderAll(data); }
+  await fetchAll();
+}
+
+/* ════════════════════════════════════════════
+   LOADER
+   ════════════════════════════════════════════ */
+function showLoader(msg='LOADING...'){
+  document.getElementById('loader').style.display='flex';
+  document.getElementById('loader-text').textContent=msg;
+}
+function hideLoader(){
+  document.getElementById('loader').style.display='none';
+}
+
+/* ════════════════════════════════════════════
+   SIDEBAR RENDER
+   ════════════════════════════════════════════ */
+function fmt(p, sym){ 
+  if(p==null) return '—';
+  if(sym==='AVGO') return '$'+Math.round(p).toLocaleString();
+  if(p>=100) return '$'+p.toFixed(0);
+  return '$'+p.toFixed(2);
+}
+
+const SCENARIO_CFG = {
+  TRENDING_DAY:     { c:'var(--green)',  icon:'→', label:'Trending day'      },
+  RANGE_BOUND:      { c:'var(--yellow)', icon:'↔', label:'Range-bound / pin' },
+  VOLATILITY_EVENT: { c:'var(--red)',    icon:'⚡', label:'Volatility event'  },
+  GATEKEEPER_TEST:  { c:'var(--orange)', icon:'⬡', label:'Gatekeeper test'   },
+  STANDARD:         { c:'var(--t2)',     icon:'·', label:'Standard'          },
+  UNKNOWN:          { c:'var(--t4)',     icon:'?', label:'Unknown'           },
+};
+
+function renderScenario(d){
+  const sc  = d.scenario;
+  if(!sc){ document.getElementById('scenario-el').innerHTML=''; return; }
+  const cfg = SCENARIO_CFG[sc.scenario] || SCENARIO_CFG.STANDARD;
+  const notes = (sc.notes||[]).slice(0,3);
+  const el  = document.getElementById('scenario-el');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+      <span style="font-size:14px;color:${cfg.c}">${cfg.icon}</span>
+      <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${cfg.c};letter-spacing:.06em;text-transform:uppercase">${cfg.label}</span>
+    </div>
+    ${notes.map(n=>`<div style="font-size:10px;color:var(--t2);line-height:1.5;padding:2px 0;border-left:2px solid ${cfg.c};padding-left:6px;margin-bottom:3px">${n}</div>`).join('')}`;
+}
+
+function renderSidebar(d){
+  const sym = d.symbol;
+  const L   = d.levels;
+
+  // Spot
+  const sp = document.getElementById('sb-spot');
+  sp.textContent = fmt(d.spot, sym);
+  sp.className   = 'sv ' + (d.chg_pct >= 0 ? 'g' : 'r');
+  document.getElementById('sb-chg').textContent =
+    (d.chg_pct>=0?'+':'') + d.chg_pct + '%  $'+(d.chg_pct>=0?'+':'')+d.chg_dollar;
+
+  // Key levels sorted high → low
+  const sc = d.scenario || {};
+  const kingPos = sc.king_positive;
+  const levels = [
+    {n:'Call wall',  p:L.call_wall,     c:'var(--yellow)', note:'resist'},
+    {n:'★ King',     p:sc.king_strike,  c:kingPos===false?'var(--purple)':'var(--yellow)', note:kingPos===false?'amplifier (−GEX)':'EOW pin (+GEX)'},
+    {n:'Spot',       p:d.spot,          c:'var(--green)',  note:'now'},
+    {n:'Flip',       p:L.gamma_flip,    c:'var(--blue)',   note:'regime'},
+    {n:'Put wall',   p:L.put_wall,      c:'var(--purple)', note:'support'},
+    {n:'Max pain',   p:L.max_pain,      c:'var(--t3)',     note:'OI settle'},
+  ].filter(l=>l.p!=null).sort((a,b)=>b.p-a.p);
+
+  const ll = document.getElementById('lvl-list');
+  ll.innerHTML = '';
+  levels.forEach(l => {
+    const row = document.createElement('div');
+    row.className = 'lrow';
+    row.innerHTML = `<div class="ldot" style="background:${l.c}"></div>
+      <div class="lname">${l.n}</div>
+      <div class="lprice">${fmt(l.p,sym)}</div>
+      <div class="lnote">${l.note}</div>`;
+    ll.appendChild(row);
+  });
+
+  // Regime
+  const reg = document.getElementById('regime-el');
+  const isDamp = L.regime === 'DAMPENED';
+  reg.innerHTML = `<div class="regime" style="border-color:var(--${isDamp?'yellow':'purple'});color:var(--${isDamp?'yellow':'purple'})">
+    <span style="width:6px;height:6px;border-radius:50%;background:var(--${isDamp?'yellow':'purple'});display:inline-block"></span>
+    ${L.regime}
+  </div>`;
+
+  // Greek exposures
+  const gr = document.getElementById('greek-rows');
+  gr.innerHTML = `
+    <div class="greek-row"><span class="greek-name">GEX</span><span class="greek-val" style="color:${L.net_gex_m>=0?'var(--yellow)':'var(--purple)'}">${(L.net_gex_m>=0?'+':'')+L.net_gex_m}M</span></div>
+    <div class="greek-row"><span class="greek-name">VEX</span><span class="greek-val" style="color:${L.net_vex_m>=0?'var(--green)':'var(--red)'}">${(L.net_vex_m>=0?'+':'')+L.net_vex_m}M</span><span style="font-size:9px;color:var(--t3);margin-left:6px">${L.vex_bias.replace('_',' ')}</span></div>
+    <div class="greek-row"><span class="greek-name">CEX</span><span class="greek-val" style="color:var(--t2)">${(L.net_cex_k>=0?'+':'')+L.net_cex_k}K</span><span style="font-size:9px;color:var(--t3);margin-left:6px">${L.cex_bias.replace('_',' ')}</span></div>`;
+
+  // Confluence
+  const conf = document.getElementById('conf-el');
+  const cmap = {
+    3: {c:'var(--green)',  t:'HIGH — all 3 greeks aligned'},
+    2: {c:'var(--yellow)', t:'MODERATE — 2 of 3 aligned'},
+    1: {c:'var(--red)',    t:'LOW — signals split'},
+  };
+  const cm = cmap[L.confluence] || cmap[1];
+  conf.innerHTML = `<div class="conf-row"><div class="conf-dot" style="background:${cm.c}"></div><div class="conf-lbl" style="color:${cm.c};font-weight:500">${cm.t}</div></div>`;
+
+  // Expirations
+  const el = document.getElementById('exp-list');
+  el.innerHTML = (d.expirations||[]).map(e =>
+    `<div>${e.expiry} <span style="color:var(--t4)">(${e.dte}d, w=${e.weight})</span></div>`
+  ).join('');
+
+  // Scenario panel
+  renderScenario(d);
+
+  // Timestamp
+  document.getElementById('tslbl').textContent =
+    new Date(d.fetched_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})+' ET';
+}
+
+/* ════════════════════════════════════════════
+   MINI LIST
+   ════════════════════════════════════════════ */
+function buildMini(){
+  const el = document.getElementById('mlist');
+  el.innerHTML = '';
+  TICKERS.forEach((s,i) => {
+    const d = allData[s];
+    const L = d?.levels;
+    const gexM = L ? L.net_gex_m : 0;
+    const pct  = Math.min(Math.abs(gexM)/30, 1);
+    const bc   = gexM >= 0 ? 'var(--yellow)' : 'var(--purple)';
+    const regime = L?.regime || '—';
+    const biasC  = regime==='DAMPENED' ? 'var(--yellow)' : 'var(--purple)';
+    const chg    = d?.chg_pct ?? '—';
+    const chgC   = chg >= 0 ? 'var(--green)' : 'var(--red)';
+    const spot   = d?.spot ? fmt(d.spot, s) : '—';
+
+    const div = document.createElement('div');
+    div.className = 'mticker' + (s===curSym?' on':'');
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="msym">${s}</span>
+        <span class="mchg" style="color:${chgC}">${chg==='—'?'—':(chg>=0?'+':'')+chg+'%'}</span>
+      </div>
+      <div style="color:var(--t2);font-family:var(--mono);font-size:10px">${spot}</div>
+      <div class="mbar"><div class="mbar-fill" style="width:${Math.round(pct*100)}%;background:${bc}"></div></div>
+      <div class="mbias" style="color:${biasC}">${regime}</div>`;
+    div.onclick = () => pick(s);
+    el.appendChild(div);
+  });
+}
+
+/* ════════════════════════════════════════════
+   PRICE CHART (lightweight-charts)
+   ════════════════════════════════════════════ */
+let priceChart = null;
+let candleSeries = null;
+let boundsSeries = null;
+let priceLines = [];
+let curTimeframe = '1D';
+
+function initPriceChart(){
+  if(priceChart) return;
+  const el = document.getElementById('priceChart');
+  priceChart = LightweightCharts.createChart(el, {
+    autoSize: true,
+    layout: { background:{ type:'solid', color:'#080a0e' }, textColor:'#8b93a8', fontSize:11, fontFamily:"'JetBrains Mono',monospace" },
+    grid:   { vertLines:{ color:'rgba(35,40,54,.5)' }, horzLines:{ color:'rgba(35,40,54,.5)' } },
+    rightPriceScale: { borderColor:'#232836', textColor:'#8b93a8' },
+    timeScale: { borderColor:'#232836', timeVisible:false },
+    crosshair: { mode:1, vertLine:{ color:'rgba(255,255,255,.25)', width:1, style:2 }, horzLine:{ color:'rgba(255,255,255,.25)', width:1, style:2 } },
+  });
+  candleSeries = priceChart.addCandlestickSeries({
+    upColor:'#36d68a', downColor:'#ef5350',
+    borderUpColor:'#36d68a', borderDownColor:'#ef5350',
+    wickUpColor:'#36d68a', wickDownColor:'#ef5350',
+  });
+  boundsSeries = priceChart.addLineSeries({
+    color:'rgba(0,0,0,0)', lineWidth:0,
+    lastValueVisible:false, priceLineVisible:false, crosshairMarkerVisible:false,
+  });
+}
+
+function renderPriceChart(d){
+  initPriceChart();
+  const frames = d.price_frames || { '1D': d.price_history || [] };
+  const bars   = frames[curTimeframe] || frames['1D'] || [];
+  if(bars.length === 0) return;
+
+  candleSeries.setData(bars);
+  document.getElementById('priceHdrSym').textContent = d.symbol;
+
+  // Remove old price lines
+  priceLines.forEach(pl => candleSeries.removePriceLine(pl));
+  priceLines = [];
+
+  const addLine = (price, color, title, opts={}) => {
+    if(price == null) return;
+    priceLines.push(candleSeries.createPriceLine({
+      price,
+      color,
+      lineWidth: opts.width || 1,
+      lineStyle: opts.style != null ? opts.style : 2,
+      axisLabelVisible: opts.axisLabel !== false,
+      title,
+    }));
+  };
+
+  const L = d.levels;
+  const sc = d.scenario || {};
+  const nodeBy = {}; (d.nodes || []).forEach(n => nodeBy[n.strike] = n);
+  const kingColor = sc.king_positive ? '#f5c540' : '#9c6ef0';
+  const kingLabel = sc.king_positive ? '★ KING (+)' : '★ KING (−)';
+
+  addLine(L.call_wall,  '#f5c540', 'CALL WALL');
+  addLine(sc.king_strike, kingColor, kingLabel, {width:2});
+  addLine(L.gamma_flip, '#4d9ef5', 'FLIP');
+  addLine(L.put_wall,   '#9c6ef0', 'PUT WALL');
+  addLine(d.spot,       '#36d68a', 'SPOT',      {style:0, width:2});
+
+  // Gatekeepers — top 2 nodes blocking the path between spot and King
+  (sc.gatekeeper_strikes || []).slice(0,2).forEach((k,i) => {
+    const n = nodeBy[k];
+    const gc = (n && n.is_positive) ? '#f5c540' : '#9c6ef0';
+    const sign = (n && n.is_positive) ? '+' : '−';
+    addLine(k, gc, `G${i+1} (${sign})`, {style:3, axisLabel:true});
+  });
+
+  // Cluster zones — for each cluster_id, draw its top+bottom strike as faint rails
+  const byCluster = {};
+  (d.nodes || []).forEach(n => {
+    if(n.cluster_id == null) return;
+    (byCluster[n.cluster_id] = byCluster[n.cluster_id] || []).push(n);
+  });
+  Object.values(byCluster).forEach(group => {
+    if(group.length < 3) return;
+    const strikes = group.map(n => n.strike);
+    const lo = Math.min(...strikes), hi = Math.max(...strikes);
+    const pos = group[0].is_positive;
+    const color = pos ? 'rgba(245,197,64,.55)' : 'rgba(156,110,240,.55)';
+    addLine(hi, color, pos ? 'CLUSTER▲' : 'CLUSTER▲', {style:1, axisLabel:false});
+    addLine(lo, color, pos ? 'CLUSTER▼' : 'CLUSTER▼', {style:1, axisLabel:false});
+  });
+
+  // Force price scale to include all level lines (King etc. often outside candle range)
+  const levelPrices = [
+    L.call_wall, L.put_wall, L.gamma_flip, sc.king_strike, d.spot,
+    ...(sc.gatekeeper_strikes || []),
+  ].filter(p => p != null && isFinite(p));
+  if(levelPrices.length && bars.length){
+    const candleHighs = bars.map(b => b.high);
+    const candleLows  = bars.map(b => b.low);
+    const maxP = Math.max(...candleHighs, ...levelPrices) * 1.01;
+    const minP = Math.min(...candleLows,  ...levelPrices) * 0.99;
+    const firstT = bars[0].time, lastT = bars[bars.length-1].time;
+    boundsSeries.setData([
+      { time: firstT, value: minP },
+      { time: lastT,  value: maxP },
+    ]);
+  }
+
+  setTimeout(() => priceChart.timeScale().fitContent(), 0);
+}
+
+function setTimeframe(tf){
+  curTimeframe = tf;
+  document.querySelectorAll('.tf-btn').forEach(b =>
+    b.classList.toggle('on', b.dataset.tf === tf)
+  );
+  if(curData) renderPriceChart(curData);
+}
+document.querySelectorAll('.tf-btn').forEach(b =>
+  b.addEventListener('click', () => setTimeframe(b.dataset.tf))
+);
+
+/* ════════════════════════════════════════════
+   CANVAS (GEX histogram)
+   ════════════════════════════════════════════ */
+function draw(d){
+  const cw = document.getElementById('gexWrap');
+  const W  = cw.clientWidth || 400;
+  const H  = cw.clientHeight || 560;
+  const cv = document.getElementById('hm');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const nodes  = d.nodes;           // already sorted high→low strike
+  const N      = nodes.length;
+  if(N===0) return;
+
+  const vals   = nodes.map(n => mode==='gex'?n.gex : mode==='vex'?n.vex : n.net_oi);
+  const maxAbs = Math.max(...vals.map(Math.abs), 1);
+
+  const LPAD=72, RPAD=34, TPAD=18, BPAD=18;
+  const cW   = W - LPAD - RPAD;
+  const cH   = H - TPAD - BPAD;
+  const rowH = Math.max(5, Math.min(34, cH/N));
+  const tot  = rowH * N;
+  const oy   = TPAD + (cH - tot)/2;
+
+  // Grid
+  ctx.strokeStyle='rgba(35,40,54,.8)'; ctx.lineWidth=0.5;
+  [.2,.4,.6,.8].forEach(f=>{
+    const x=LPAD+f*cW*.86;
+    ctx.beginPath();ctx.moveTo(x,oy);ctx.lineTo(x,oy+tot);ctx.stroke();
+  });
+
+  // Zero baseline
+  ctx.strokeStyle='rgba(60,68,90,.8)'; ctx.lineWidth=1; ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(LPAD,oy);ctx.lineTo(LPAD,oy+tot);ctx.stroke();
+
+  // ── Node type visual config ──────────────────────────────────────
+  // Maps node_type → {row glow, dashed line, right-margin badge color}
+  const TYPE_CFG = {
+    KING:         { glow:'rgba(245,197,64,.07)',  line:'rgba(245,197,64,.55)', dash:[4,3], badge:'#f5c540', label:'★ KING'       },
+    GATEKEEPER:   { glow:'rgba(156,110,240,.06)', line:'rgba(156,110,240,.45)',dash:[3,3], badge:'#9c6ef0', label:'⬡ GATE'       },
+    CLUSTER:      { glow:'rgba(77,158,245,.04)',  line:null,                   dash:null,  badge:'#4d9ef5', label:'▬ CLUSTER'    },
+    DOUBLE_STACK: { glow:'rgba(240,154,56,.05)',  line:'rgba(240,154,56,.35)', dash:[2,4], badge:'#f09a38', label:'◈ STACK'      },
+    VELOCITY:     { glow:'rgba(239,83,80,.06)',   line:'rgba(239,83,80,.5)',   dash:[1,3], badge:'#ef5350', label:'⚡ VELOCITY'  },
+    STANDARD:     { glow:null,                    line:null,                   dash:null,  badge:null,      label:null           },
+  };
+
+  // Nodes
+  nodes.forEach((node,i)=>{
+    const val  = mode==='gex'?node.gex : mode==='vex'?node.vex : node.net_oi;
+    const frac = Math.abs(val)/maxAbs;
+    const y    = oy + i*rowH;
+    const isPos = node.is_positive;    // use classifier's determination
+    const cfg   = TYPE_CFG[node.node_type] || TYPE_CFG.STANDARD;
+
+    // Row background glow (by type)
+    if(cfg.glow){
+      ctx.fillStyle = cfg.glow;
+      ctx.fillRect(LPAD, y, cW, rowH);
+    }
+
+    // Type indicator line (dashed horizontal rule on right side)
+    if(cfg.line && rowH >= 7){
+      ctx.strokeStyle = cfg.line; ctx.lineWidth = 0.7;
+      ctx.setLineDash(cfg.dash);
+      ctx.beginPath();
+      ctx.moveTo(LPAD, y + rowH/2);
+      ctx.lineTo(LPAD + cW*0.86, y + rowH/2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Cluster background stripe (slightly more visible band)
+    if(node.node_type === 'CLUSTER'){
+      ctx.fillStyle = isPos ? 'rgba(77,158,245,.04)' : 'rgba(156,110,240,.04)';
+      ctx.fillRect(LPAD, y, cW*0.86, rowH);
+    }
+
+    // Bar background
+    ctx.fillStyle = isPos ? 'rgba(245,197,64,.06)' : 'rgba(156,110,240,.06)';
+    ctx.fillRect(LPAD, y+1, cW*0.86, rowH-2);
+
+    // Bar fill — velocity nodes get a brighter inner glow
+    const bw = frac * cW * 0.86;
+    const alphaBase = node.node_type==='VELOCITY' ? 0.5 : 0.3;
+    ctx.globalAlpha = alphaBase + frac * (1 - alphaBase);
+    ctx.fillStyle   = isPos ? '#f5c540' : '#9c6ef0';
+    ctx.fillRect(LPAD, y+1, bw, rowH-2);
+    ctx.globalAlpha = 1;
+
+    // Leading edge highlight
+    if(bw > 4){
+      ctx.globalAlpha = Math.min(0.95, 0.45 + frac*0.55);
+      ctx.fillRect(LPAD + bw - 2, y+1, 2, rowH-2);
+      ctx.globalAlpha = 1;
+    }
+
+    // Strength dots (right of bar, before type badge) — only if rowH ≥ 10
+    if(rowH >= 10 && node.strength >= 1){
+      const dotX = LPAD + cW*0.86 + 4;
+      const dotY = y + rowH/2;
+      const dotC = isPos ? 'rgba(245,197,64,' : 'rgba(156,110,240,';
+      for(let s=0; s<node.strength; s++){
+        ctx.fillStyle = dotC + (0.25 + s*0.18) + ')';
+        ctx.beginPath();
+        ctx.arc(dotX + s*5, dotY, 1.6, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // Hover ring
+    if(hovered === node.strike){
+      ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=.9; ctx.setLineDash([]);
+      ctx.strokeRect(LPAD, y+.5, cW*0.86, rowH-1);
+    }
+  });
+
+  // Strike labels + type badges (right margin)
+  ctx.textAlign='right';
+  const step = N>50?6:N>30?4:N>18?3:N>10?2:1;
+  nodes.forEach((node,i)=>{
+    if(i % step !== 0) return;
+    const y = oy + i*rowH + rowH/2;
+    ctx.font = '9px JetBrains Mono,monospace';
+    // Label color: King=gold, Gate=purple, Velocity=red, Stack=orange, rest=dim
+    const lc = node.node_type==='KING'       ? '#f5c540'
+             : node.node_type==='GATEKEEPER' ? '#9c6ef0'
+             : node.node_type==='VELOCITY'   ? '#ef5350'
+             : node.node_type==='DOUBLE_STACK'? '#f09a38'
+             : node.is_call_wall||node.is_put_wall ? '#4d9ef5'
+             : '#505870';
+    ctx.fillStyle = lc;
+    const lbl = node.strike>=200 ? Math.round(node.strike).toString()
+              : node.strike.toFixed(node.strike>=50?0:2);
+    ctx.fillText(lbl, LPAD-4, y+3);
+  });
+
+  // Right-margin type badges (King, Gate, Velocity, Stack only)
+  ctx.textAlign='left';
+  ctx.font='8px JetBrains Mono,monospace';
+  const BADGE_X = W - RPAD - 2;
+  nodes.forEach((node,i)=>{
+    const cfg = TYPE_CFG[node.node_type];
+    if(!cfg?.badge || !cfg?.label) return;
+    const y = oy + i*rowH + rowH/2;
+    if(y < oy || y > oy+tot) return;
+    ctx.fillStyle = cfg.badge;
+    ctx.globalAlpha = 0.75;
+    ctx.fillText(cfg.label, BADGE_X - ctx.measureText(cfg.label).width, y+3);
+    ctx.globalAlpha = 1;
+  });
+
+  // Gamma flip line
+  const flipNode = nodes.find(n=>n.is_flip);
+  if(flipNode){
+    const fi = nodes.indexOf(flipNode);
+    const fy = oy+fi*rowH+rowH/2;
+    ctx.strokeStyle='rgba(77,158,245,.48)'; ctx.lineWidth=1; ctx.setLineDash([2,3]);
+    ctx.beginPath();ctx.moveTo(LPAD,fy);ctx.lineTo(LPAD+cW*.86,fy);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(77,158,245,.6)';ctx.font='8px JetBrains Mono,monospace';ctx.textAlign='left';
+    ctx.fillText('FLIP',LPAD+cW*.86+4,fy+3);
+  }
+
+  // Price line
+  const si = nodes.reduce((b,n,i)=>Math.abs(n.strike-d.spot)<Math.abs(nodes[b].strike-d.spot)?i:b,0);
+  const sy  = oy+si*rowH+rowH/2;
+  ctx.strokeStyle='rgba(54,214,138,.88)'; ctx.lineWidth=1.5; ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(LPAD,sy);ctx.lineTo(W-RPAD,sy);ctx.stroke();
+
+  document.getElementById('ptag').style.cssText=`display:block;top:${sy-9}px`;
+  document.getElementById('ptag').textContent = fmt(d.spot, d.symbol);
+
+  // King tag
+  const ki = nodes.findIndex(n=>n.is_king);
+  const kt = document.getElementById('ktag');
+  if(ki>=0){
+    const ky=oy+ki*rowH+rowH/2;
+    kt.style.cssText=`display:block;top:${ky-9}px;left:${W-132}px`;
+  } else kt.style.display='none';
+
+  cv._layout={oy,rowH,N,LPAD};
+}
+
+/* ════════════════════════════════════════════
+   MOUSE
+   ════════════════════════════════════════════ */
+document.getElementById('hm').addEventListener('mousemove',e=>{
+  if(!curData) return;
+  const L=document.getElementById('hm')._layout;
+  if(!L) return;
+  const idx=Math.floor((e.offsetY-L.oy)/L.rowH);
+  if(idx<0||idx>=L.N){
+    if(hovered !== null){
+      hovered=null;
+      document.getElementById('xh').style.display='none';
+      document.getElementById('hp').style.display='none';
+      draw(curData);
+    }
+    return;
+  }
+  const node=curData.nodes[idx];
+  const changed = hovered !== node.strike;
+  hovered=node.strike;
+
+  document.getElementById('xh').style.cssText=`display:block;top:${L.oy+idx*L.rowH}px`;
+
+  const TYPE_LABELS = {
+    KING:'★ King Node', GATEKEEPER:'⬡ Gatekeeper', CLUSTER:'▬ Cluster',
+    DOUBLE_STACK:'◈ Double Stack', VELOCITY:'⚡ Velocity', STANDARD:'Node'
+  };
+  const TYPE_COLORS = {
+    KING:'#f5c540', GATEKEEPER:'#9c6ef0', CLUSTER:'#4d9ef5',
+    DOUBLE_STACK:'#f09a38', VELOCITY:'#ef5350', STANDARD:'#8b93a8'
+  };
+  const typeLbl = TYPE_LABELS[node.node_type] || 'Node';
+  const typeCol = TYPE_COLORS[node.node_type] || '#8b93a8';
+  const stars   = '●'.repeat(node.strength) + '○'.repeat(5-node.strength);
+  const dist    = ((node.strike-curData.spot)/curData.spot*100).toFixed(1);
+  const charLbl = node.is_positive ? '🟡 Absorbing (Pika)' : '🟣 Amplifying (Barney)';
+
+  const hp=document.getElementById('hp');
+  const cw=document.getElementById('cw');
+  hp.style.cssText=`display:block;top:${Math.min(L.oy+idx*L.rowH-5,cw.clientHeight-130)}px;left:${L.LPAD+20}px`;
+  hp.innerHTML=`<span style="color:${typeCol};font-weight:600">${typeLbl}</span>  <span style="color:var(--t3);font-size:9px">${stars}</span><br>
+Strike: ${fmt(node.strike,curData.symbol)} <span style="color:var(--t3)">(${dist}% from spot)</span><br>
+${charLbl}<br>
+GEX: ${(node.gex/1e6).toFixed(3)}M | VEX: ${(node.vex/1e6).toFixed(3)}M<br>
+Call OI: ${node.call_oi.toLocaleString()} | Put OI: ${node.put_oi.toLocaleString()}`;
+
+  if(changed) draw(curData);
+});
+
+document.getElementById('hm').addEventListener('mouseleave',()=>{
+  hovered=null;
+  document.getElementById('xh').style.display='none';
+  document.getElementById('hp').style.display='none';
+  if(curData) draw(curData);
+});
+
+/* ════════════════════════════════════════════
+   MAIN RENDER
+   ════════════════════════════════════════════ */
+function renderAll(d){
+  renderSidebar(d);
+  renderPriceChart(d);
+  draw(d);
+}
+
+/* ════════════════════════════════════════════
+   STARTUP + AUTO-REFRESH
+   ════════════════════════════════════════════ */
+async function init(){
+  buildMini();
+  showLoader('CONNECTING TO SINCLAIR SERVER...');
+
+  const ok = await checkServer();
+  if(!ok){
+    hideLoader();
+    document.getElementById('loader').style.display='flex';
+    document.getElementById('loader-text').textContent =
+      'SERVER OFFLINE — run: python sinclair_server.py';
+    return;
+  }
+
+  // Fetch first ticker
+  const data = await fetchTicker(curSym);
+  if(data){ curData = data; renderAll(data); }
+
+  // Fetch all summaries for mini list
+  await fetchAll();
+
+  // Auto-refresh
+  setInterval(async()=>{
+    const d = await fetchTicker(curSym);
+    if(d){ curData = d; renderAll(d); }
+    await fetchAll();
+  }, REFRESH_MS);
+}
+
+window.addEventListener('resize', ()=>{
+  if(curData) draw(curData);
+});
+
+init();
+</script>
+</body>
+</html>
