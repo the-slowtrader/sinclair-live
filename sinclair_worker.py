@@ -272,25 +272,60 @@ def main():
     symbol = sys.argv[1].upper()
 
     try:
-        ticker = yf.Ticker(symbol)
+        # Map display-friendly ticker to the one yfinance/FMP expects
+        YF_ALIAS  = {'SPX': '^SPX', 'VIX': '^VIX', 'NDX': '^NDX', 'RUT': '^RUT'}
+        yf_symbol = YF_ALIAS.get(symbol, symbol)
+        ticker = yf.Ticker(yf_symbol)
 
-        # ── Real-time spot + daily history from FMP ──
+        # ── Try FMP for price; fall back to yfinance if FMP returns empty/error ──
         from datetime import timedelta
         today = datetime.now().date()
-        quote = _fmp_get('quote', {'symbol': symbol})
-        if not quote or not isinstance(quote, list) or not quote[0].get('price'):
-            print(json.dumps({'symbol': symbol, 'error': 'FMP quote failed'}))
-            sys.exit(0)
-        q = quote[0]
-        spot  = float(q['price'])
-        chg_d = round(float(q.get('change') or 0), 2)
-        chg   = round(float(q.get('changePercentage') or 0), 2)
+        spot = chg_d = chg = None
+        price_history = []
 
-        eod = _fmp_get('historical-price-eod/full', {
-            'symbol': symbol,
-            'from':   (today - timedelta(days=90)).isoformat(),
-            'to':     today.isoformat(),
-        }) or []
+        try:
+            quote = _fmp_get('quote', {'symbol': symbol})
+            if isinstance(quote, list) and quote and quote[0].get('price') is not None:
+                q = quote[0]
+                spot  = float(q['price'])
+                chg_d = round(float(q.get('change') or 0), 2)
+                chg   = round(float(q.get('changePercentage') or 0), 2)
+        except Exception:
+            pass
+
+        if spot is None:
+            # yfinance fallback for symbols FMP Starter doesn't serve (SPX, indices, etc.)
+            hist_recent = ticker.history(period="5d")
+            if hist_recent.empty:
+                print(json.dumps({'symbol': symbol, 'error': 'No price data (FMP + yfinance both failed)'}))
+                sys.exit(0)
+            spot = float(hist_recent['Close'].iloc[-1])
+            if len(hist_recent) >= 2:
+                prev  = float(hist_recent['Close'].iloc[-2])
+                chg_d = round(spot - prev, 2)
+                chg   = round((spot - prev) / prev * 100, 2)
+            else:
+                chg_d = chg = 0.0
+
+        eod = []
+        try:
+            eod = _fmp_get('historical-price-eod/full', {
+                'symbol': symbol,
+                'from':   (today - timedelta(days=90)).isoformat(),
+                'to':     today.isoformat(),
+            }) or []
+        except Exception:
+            pass
+        if not eod:
+            # yfinance fallback for historical bars
+            hist_long = ticker.history(period="90d", interval="1d")
+            eod = [{
+                'date':  ts.strftime('%Y-%m-%d'),
+                'open':  float(row['Open']),
+                'high':  float(row['High']),
+                'low':   float(row['Low']),
+                'close': float(row['Close']),
+            } for ts, row in hist_long.iterrows()]
         eod = sorted(eod, key=lambda r: r.get('date',''))
 
         def _fmt_daily(rows):

@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Sinclair AI — Heatseeker Live</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
@@ -183,9 +186,9 @@ html,body{height:100%;background:var(--bg0);color:var(--t1);font-family:var(--sa
           <span class="sym" id="priceHdrSym">SPY</span>
           <span id="priceHdrMeta">price + gamma levels</span>
           <div class="tf-group" id="tfGroup">
-            <button class="tf-btn" data-tf="1H">1H</button>
-            <button class="tf-btn" data-tf="4H">4H</button>
-            <button class="tf-btn on" data-tf="1D">1D</button>
+            <button class="tf-btn on" data-tf="1H">24H</button>
+            <button class="tf-btn" data-tf="5D">5D</button>
+            <button class="tf-btn" data-tf="1D">1D</button>
           </div>
         </div>
         <div id="priceChart" style="position:absolute;inset:0"></div>
@@ -216,7 +219,9 @@ html,body{height:100%;background:var(--bg0);color:var(--t1);font-family:var(--sa
    CONFIG
    ════════════════════════════════════════════ */
 const API = '/api';
-const TICKERS = ["SPY","XOM","UPS","RIVN","NVDA","AMD","AAPL","HOOD","AVGO","SOFI","AFRM"];
+const TICKERS = ["SPY","SPX","XOM","UPS","RIVN","NVDA","AMD","AAPL","HOOD","AVGO","SOFI","AFRM"];
+const INDEX_TICKERS = new Set(["SPX","NDX","RUT","VIX"]);
+const defaultTfFor = sym => INDEX_TICKERS.has(sym) ? '1D' : '1H';
 const REFRESH_MS = 5 * 60 * 1000;  // 5 minutes
 
 /* ════════════════════════════════════════════
@@ -300,6 +305,9 @@ function setMode(m, el){
 
 async function pick(sym){
   curSym = sym;
+  // Default timeframe switches with ticker type: indices → 1D, equities → 1H (intraday)
+  curTimeframe = defaultTfFor(sym);
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('on', b.dataset.tf === curTimeframe));
   document.querySelectorAll('.ttab').forEach(b => b.classList.toggle('on', b.textContent===sym));
   document.querySelectorAll('.mticker').forEach((b,i) => b.classList.toggle('on', TICKERS[i]===sym));
   const data = await fetchTicker(sym);
@@ -470,7 +478,7 @@ let priceChart = null;
 let candleSeries = null;
 let boundsSeries = null;
 let priceLines = [];
-let curTimeframe = '1D';
+let curTimeframe = '1H';  // set properly in init() based on first ticker
 
 function initPriceChart(){
   if(priceChart) return;
@@ -497,7 +505,19 @@ function initPriceChart(){
 function renderPriceChart(d){
   initPriceChart();
   const frames = d.price_frames || { '1D': d.price_history || [] };
-  const bars   = frames[curTimeframe] || frames['1D'] || [];
+  // Timeframe → source frame + slice (1H source sliced to give 24H and 5D views)
+  const tfMap = {
+    '1H': { src: '1H', take: 8   },  // ~1 trading day of hourly = "24H"
+    '5D': { src: '1H', take: 35  },  // ~5 trading days of hourly
+    '1D': { src: '1D', take: null},  // full daily
+  };
+  const cfg = tfMap[curTimeframe] || tfMap['1D'];
+  let bars = frames[cfg.src] || frames['1D'] || [];
+  if(cfg.take) bars = bars.slice(-cfg.take);
+  if(bars.length === 0){
+    // Fallback to 1D if this timeframe has no data for the ticker (e.g. SPX has no 1H)
+    bars = frames['1D'] || [];
+  }
   if(bars.length === 0) return;
 
   candleSeries.setData(bars);
@@ -841,6 +861,9 @@ function renderAll(d){
    ════════════════════════════════════════════ */
 async function init(){
   buildMini();
+  // Default timeframe for the first ticker (SPY = equity → 1H)
+  curTimeframe = defaultTfFor(curSym);
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('on', b.dataset.tf === curTimeframe));
   showLoader('CONNECTING TO SINCLAIR SERVER...');
 
   const ok = await checkServer();
