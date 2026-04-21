@@ -219,7 +219,7 @@ html,body{height:100%;background:var(--bg0);color:var(--t1);font-family:var(--sa
    CONFIG
    ════════════════════════════════════════════ */
 const API = '/api';
-const TICKERS = ["SPY","SPX","XOM","UPS","RIVN","NVDA","AMD","AAPL","HOOD","AVGO","SOFI","AFRM"];
+const TICKERS = ["SPY","SPX","UVXY","XOM","UPS","RIVN","NVDA","AMD","AAPL","HOOD","AVGO","SOFI","AFRM"];
 const INDEX_TICKERS = new Set(["SPX","NDX","RUT","VIX"]);
 const defaultTfFor = sym => INDEX_TICKERS.has(sym) ? '1D' : '1H';
 const REFRESH_MS = 5 * 60 * 1000;  // 5 minutes

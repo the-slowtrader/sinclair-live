@@ -23,7 +23,7 @@ file can fetch from file:// or any local origin.
 
 import subprocess, json, sys, os
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify
 from flask_cors import CORS
 import threading
 import time
@@ -39,12 +39,12 @@ CORS(app)
 # ─────────────────────────────────────────────
 
 CORE_TICKERS = [
-    "SPY", "XOM", "UPS", "RIVN", "NVDA",
+    "SPY", "SPX", "UVXY", "XOM", "UPS", "RIVN", "NVDA",
     "AMD", "AAPL", "HOOD", "AVGO", "SOFI", "AFRM"
 ]
 
 CACHE_TTL = 300     # Seconds before re-fetching (5 min)
-PORT      = int(os.environ.get('PORT', 5050))  # Render sets $PORT
+PORT      = 5050
 
 # Path to the worker script (runs yfinance in its own process)
 WORKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sinclair_worker.py')
@@ -106,10 +106,6 @@ def fetch_ticker_data(symbol):
 # ─────────────────────────────────────────────
 #  ROUTES
 # ─────────────────────────────────────────────
-
-@app.route('/')
-def root():
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'sinclair_heatseeker_live.html')
 
 @app.route('/api/health')
 def health():
